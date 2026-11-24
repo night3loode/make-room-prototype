@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Make Room prototype v2</title><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"><style>
+/* VOICE: calm working demo for a design review
+   IDEA: the hostel common room seen from the ceiling camera, residents animated in real time
+   PICTURE: the team's own floor plan with walking, sitting and sprawling people, plus the wall screen
+   COLOUR and TYPE: drafting-paper floor, sofa blue #7eaad9 from the plan, coral #e4572e for nudges; DM Sans
+   LAYOUT: plan large on the left, screen + controls + detector beside it; stacked on phones */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#0f1317);--ink:light-dark(#16202a,#e9eef3);--mute:light-dark(#5b6977,#9aa8b6);--line:light-dark(#dfe5eb,#26313c);--floor:light-dark(#fbfaf5,#1a1f25);--grid:light-dark(#ebe8dc,#252c34);--wall:light-dark(#111,#cfd6dd);--card:light-dark(#fff,#141b22);--soft:light-dark(#f3f5f7,#182028);--acc:#e4572e;--ok:#2e9d6a}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "DM Sans",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(18px,3vw,36px) max(4vw,14px);max-width:1240px;margin:auto}
+h1{font-size:clamp(28px,4vw,40px);line-height:1.05;margin:0 0 6px;text-wrap:balance}
+.sub{color:var(--mute);margin:0 0 16px;max-width:70ch}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+#plan{width:100%;height:auto;display:block;border-radius:14px;border:1px solid var(--line);background:var(--soft);touch-action:manipulation;cursor:pointer}
+.floor{fill:var(--floor)}.gridl{stroke:var(--grid)}.wall{stroke:var(--wall);stroke-width:10;stroke-linecap:square}
+.sf{fill:#7eaad9;stroke:#1d2a38;stroke-width:2}.cu{fill:#93bde6;stroke:#1d2a38;stroke-width:1.5}
+.tb{fill:#7eaad9;stroke:#1d2a38;stroke-width:2}.tb2{fill:#cddff0;stroke:#1d2a38;stroke-width:2}
+.lb{font:500 26px "DM Sans",sans-serif;fill:var(--ink)}.lbs{font:500 18px "DM Sans",sans-serif;fill:var(--mute)}
+.ent{font:500 32px "DM Sans",sans-serif;fill:#5b6be0}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.screen{background:#0d1217;color:#f2f5f8;border-radius:12px;min-height:110px;padding:16px 18px;display:flex;align-items:center;gap:14px;border:7px solid #2a323b;transition:box-shadow .3s}
+.screen.on{box-shadow:0 0 0 4px var(--acc)}.screen.thx{box-shadow:0 0 0 4px var(--ok)}
+.screen .ico{font-size:30px;width:40px;text-align:center;flex:none}
+.screen .msg{font-size:20px;line-height:1.3}
+.screen.idle .msg{color:#6c7884;font-size:15px}
+.cap{font-size:13px;color:var(--mute);margin:6px 0 0}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+button.b{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:15px;min-height:44px;padding:8px 13px;border-radius:10px;cursor:pointer}
+button.b:hover{border-color:#7eaad9}button.b:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button.p{background:#2f5d8a;color:#fff;border-color:#2f5d8a}
+button.sel{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.lbl{font-size:13px;color:var(--mute);margin:12px 0 0}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.stat b{display:block;font-size:26px;line-height:1.1}.stat span{font-size:12px;color:var(--mute)}
+.rule{font-size:14px;padding:7px 10px;border-radius:8px;background:var(--soft);margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+.rule em{font-style:normal;font-weight:700}.y{color:var(--ok)}.n{color:var(--mute)}
+.log{list-style:none;padding:0;margin:0;font-size:14px;max-height:220px;overflow:auto}
+.log li{padding:6px 0;border-bottom:1px solid var(--line)}.log time{color:var(--mute);margin-right:6px;font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--mute);margin-top:10px}
+h2{font-size:17px;margin:0 0 8px}
+.key{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--mute);margin-top:8px}
+.key i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+</style></head><body>
+<div class="band">
+<h1>Make Room: common room nudge prototype</h1>
+<p class="sub">The common room from the ceiling camera's view. People walk in through the entry, sit, and sometimes spread out with bags, laptops, their feet, or by lying across seats. When someone can't find a seat because of that, the wall screen shows a message and plays a soft chime. There's no spoken audio. Tap <b>Turn sound on</b> to hear the chime, and tap any seated person to make them spread out or sit up.</p>
+<div class="grid">
+<div>
+<svg id="plan" viewBox="0 0 1060 1170" role="img" aria-label="Animated floor plan of the common room">
+<defs><pattern id="gp" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M26 0H0V26" fill="none" class="gridl" stroke-width="1.5"></path></pattern></defs>
+<g id="st"><rect width="1060" height="1170" fill="transparent"></rect><rect x="30" y="35" width="1000" height="1055" class="floor"></rect><rect x="30" y="35" width="1000" height="1055" fill="url(#gp)"></rect><rect x="380" y="1090" width="260" height="80" class="floor" opacity=".55"></rect><line x1="30" y1="35" x2="1030" y2="35" class="wall"></line><line x1="30" y1="35" x2="30" y2="1090" class="wall"></line><line x1="1030" y1="35" x2="1030" y2="1090" class="wall"></line><line x1="30" y1="1090" x2="380" y2="1090" class="wall"></line><line x1="640" y1="1090" x2="1030" y2="1090" class="wall"></line><path d="M1018 48 L860 160 L990 210 Z" fill="#e4572e" opacity=".07"></path><rect x="1000" y="44" width="22" height="14" rx="3" fill="#333"></rect><circle cx="1004" cy="51" r="3" fill="#e4572e"></circle><rect x="372" y="218" width="303" height="464" rx="151" class="tb2"></rect><rect x="440" y="285" width="170" height="327" rx="85" class="tb"></rect><text x="525" y="458" class="lb" text-anchor="middle">CT</text><rect x="168" y="849" width="103" height="102" class="tb"></rect><rect x="135" y="45" width="217" height="83" rx="7" class="sf"></rect><rect x="400" y="45" width="225" height="83" rx="7" class="sf"></rect><rect x="668" y="45" width="250" height="92" rx="7" class="sf"></rect><rect x="938" y="140" width="84" height="108" rx="7" class="sf"></rect><rect x="938" y="278" width="84" height="217" rx="7" class="sf"></rect><rect x="942" y="710" width="83" height="218" rx="7" class="sf"></rect><rect x="660" y="968" width="318" height="117" rx="7" class="sf"></rect><rect x="38" y="990" width="247" height="92" rx="7" class="sf"></rect><rect x="38" y="824" width="94" height="166" rx="7" class="sf"></rect><rect x="38" y="523" width="87" height="232" rx="7" class="sf"></rect><rect x="42" y="183" width="85" height="229" rx="7" class="sf"></rect><rect x="149" y="67" width="92.5" height="59" rx="10" class="cu"></rect><rect x="245.5" y="67" width="92.5" height="59" rx="10" class="cu"></rect><rect x="414" y="67" width="63" height="59" rx="10" class="cu"></rect><rect x="481" y="67" width="63" height="59" rx="10" class="cu"></rect><rect x="548" y="67" width="63" height="59" rx="10" class="cu"></rect><rect x="682" y="67" width="71.33333333333333" height="68" rx="10" class="cu"></rect><rect x="757.3333333333334" y="67" width="71.33333333333333" height="68" rx="10" class="cu"></rect><rect x="832.6666666666666" y="67" width="71.33333333333333" height="68" rx="10" class="cu"></rect><rect x="940" y="154" width="60" height="80" rx="10" class="cu"></rect><rect x="940" y="292" width="60" height="92.5" rx="10" class="cu"></rect><rect x="940" y="388.5" width="60" height="92.5" rx="10" class="cu"></rect><rect x="944" y="724" width="59" height="93" rx="10" class="cu"></rect><rect x="944" y="821" width="59" height="93" rx="10" class="cu"></rect><rect x="674" y="970" width="94" height="93" rx="10" class="cu"></rect><rect x="772" y="970" width="94" height="93" rx="10" class="cu"></rect><rect x="870" y="970" width="94" height="93" rx="10" class="cu"></rect><rect x="52" y="992" width="70.33333333333333" height="68" rx="10" class="cu"></rect><rect x="126.33333333333333" y="992" width="70.33333333333333" height="68" rx="10" class="cu"></rect><rect x="200.66666666666666" y="992" width="70.33333333333333" height="68" rx="10" class="cu"></rect><rect x="60" y="838" width="70" height="67" rx="10" class="cu"></rect><rect x="60" y="909" width="70" height="67" rx="10" class="cu"></rect><rect x="60" y="537" width="63" height="100" rx="10" class="cu"></rect><rect x="60" y="641" width="63" height="100" rx="10" class="cu"></rect><rect x="64" y="197" width="61" height="64.33333333333333" rx="10" class="cu"></rect><rect x="64" y="265.3333333333333" width="61" height="64.33333333333333" rx="10" class="cu"></rect><rect x="64" y="333.66666666666663" width="61" height="64.33333333333333" rx="10" class="cu"></rect><text x="243" y="170" class="lb" text-anchor="middle">S1</text><text x="512" y="170" class="lb" text-anchor="middle">S2</text><text x="805" y="182" class="lb" text-anchor="middle">S3-1</text><text x="930" y="222" class="lb" text-anchor="end">S3-2</text><text x="930" y="378" class="lb" text-anchor="end">S4</text><text x="934" y="822" class="lb" text-anchor="end">S5-1</text><text x="818" y="958" class="lb" text-anchor="middle">S5-2</text><text x="292" y="1050" class="lb" text-anchor="start">S6-1</text><text x="85" y="812" class="lb" text-anchor="middle">S6-2</text><text x="135" y="662" class="lb" text-anchor="start">S7</text><text x="137" y="302" class="lb" text-anchor="start">S8</text><text x="510" y="1060" class="ent" text-anchor="middle">Entry</text><rect x="1014" y="560" width="14" height="100" rx="3" fill="#0d1217"></rect><text x="1000" y="690" class="lbs" text-anchor="end">Screen</text><text x="990" y="80" class="lbs" text-anchor="end">Camera</text></g><g id="dy"><rect x="483" y="69" width="59" height="55" rx="8" fill="rgba(228,87,46,.18)" stroke="#e4572e" stroke-width="3" stroke-dasharray="7 5"></rect><rect x="504" y="68" width="38" height="20" rx="10" fill="#e4572e"></rect><text x="523" y="83" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">14s</text><rect x="942" y="390.5" width="56" height="88.5" rx="8" fill="rgba(228,87,46,.18)" stroke="#e4572e" stroke-width="3" stroke-dasharray="7 5"></rect><rect x="960" y="389.5" width="38" height="20" rx="10" fill="#e4572e"></rect><text x="979" y="404.5" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">14s</text><rect x="872" y="972" width="90" height="89" rx="8" fill="rgba(228,87,46,.18)" stroke="#e4572e" stroke-width="3" stroke-dasharray="7 5"></rect><rect x="924" y="971" width="38" height="20" rx="10" fill="#e4572e"></rect><text x="943" y="986" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">14s</text><rect x="66" y="267.3333333333333" width="57" height="60.33333333333333" rx="8" fill="rgba(228,87,46,.18)" stroke="#e4572e" stroke-width="3" stroke-dasharray="7 5"></rect><rect x="85" y="266.3333333333333" width="38" height="20" rx="10" fill="#e4572e"></rect><text x="104" y="281.3333333333333" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">14s</text><g transform="translate(917.0 1016.5) rotate(-90) scale(1.00)"><rect x="-14" y="-12" width="28" height="24" rx="6" fill="#8a5a3b" stroke="#3e2617" stroke-width="1.5"></rect><path d="M-8 -12 Q0 -24 8 -12" fill="none" stroke="#3e2617" stroke-width="3"></path><rect x="-9" y="-2" width="18" height="8" rx="2" fill="#a8734f"></rect></g><g transform="translate(94.5 362.7) rotate(0) scale(1.02)"><rect x="-17" y="-12" width="34" height="24" rx="3" fill="#9aa3ad" stroke="#4a525a" stroke-width="1.5"></rect><rect x="-14" y="-9" width="28" height="15" rx="2" fill="#cfe3f5"></rect><path d="M17 4 q14 4 8 16 t10 14" fill="none" stroke="#333" stroke-width="2"></path><rect x="-10" y="16" width="14" height="9" rx="2" fill="#555"></rect></g><g transform="translate(479.0 96.5) rotate(0.0) scale(1.15)"><g transform="translate(4.0 0) rotate(0.0)"><rect x="0" y="-9.0" width="40.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="40.0" cy="-4.5" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="0.0" width="40.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="40.0" cy="4.5" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-14.0" cy="0" rx="19.0" ry="12.0" fill="#8c5bd6" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-36.0" cy="0" r="8.5" fill="#3b2a20"></circle></g><g transform="translate(819.0 1016.5) rotate(-90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#f2a541" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#2b1d14"></circle></g><g transform="translate(94.5 365.8) rotate(0.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#5c6b73" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#2b1d14"></circle></g><g transform="translate(970.0 338.3) rotate(180.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(-90.0)"><rect x="0" y="-10.5" width="93.2" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="93.2" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="93.2" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="93.2" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#d64a8c" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#3b2a20"></circle></g><g transform="translate(195.3 96.5) rotate(90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#2c3e50"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#2c3e50"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#d64a8c" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#3b2a20"></circle></g><g transform="translate(291.8 96.5) rotate(90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#2c3e50"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#2c3e50"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#e67e22" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#3b2a20"></circle></g><g transform="translate(579.5 96.5) rotate(90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#d64a8c" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#2b1d14"></circle></g><g transform="translate(717.7 101.0) rotate(90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#e4572e" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#5a3b22"></circle></g><g transform="translate(793.0 101.0) rotate(90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#d64a8c" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#3b2a20"></circle></g><g transform="translate(868.3 101.0) rotate(90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#e67e22" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#2b1d14"></circle></g><g transform="translate(970.0 194.0) rotate(180.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#d64a8c" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#141414"></circle></g><g transform="translate(973.5 770.5) rotate(180.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#4a4a4a"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#2e9d6a" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#141414"></circle></g><g transform="translate(973.5 867.5) rotate(180.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#2c3e50"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#2c3e50"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#c0392b" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#2b1d14"></circle></g><g transform="translate(721.0 1016.5) rotate(-90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#e67e22" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#141414"></circle></g><g transform="translate(87.2 1026.0) rotate(-90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#e67e22" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#3b2a20"></circle></g><g transform="translate(161.5 1026.0) rotate(-90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#2e9d6a" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#5a3b22"></circle></g><g transform="translate(235.8 1026.0) rotate(-90.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#e67e22" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#141414"></circle></g><g transform="translate(95.0 871.5) rotate(0.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#2c3e50"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#2c3e50"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#2e9d6a" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#2b1d14"></circle></g><g transform="translate(95.0 942.5) rotate(0.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#5d4037"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#3a86c8" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#141414"></circle></g><g transform="translate(91.5 587.0) rotate(0.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#3a86c8" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#141414"></circle></g><g transform="translate(91.5 691.0) rotate(0.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#8c5bd6" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#5a3b22"></circle></g><g transform="translate(94.5 229.2) rotate(0.0) scale(1.15)"><g transform="translate(-4.0 0) rotate(0.0)"><rect x="0" y="-10.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="-6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse><rect x="0" y="1.5" width="24.0" height="9" rx="4.5" fill="#1f3a5f"></rect><ellipse cx="24.0" cy="6.0" rx="4.5" ry="4" fill="#1b1b1b"></ellipse></g><ellipse cx="-8.0" cy="0" rx="10.0" ry="16.0" fill="#3a86c8" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="-6.0" cy="0" r="8.5" fill="#3b2a20"></circle></g><g transform="translate(450.0 925.0) rotate(-125.2) scale(1.15)"><ellipse cx="3.0" cy="-6" rx="6" ry="3.6" fill="#1b1b1b"></ellipse><ellipse cx="3.0" cy="6" rx="6" ry="3.6" fill="#1b1b1b"></ellipse><ellipse cx="0" cy="0" rx="9" ry="15" fill="#5c6b73" stroke="rgba(0,0,0,.25)"></ellipse><circle cx="1" cy="0" r="8.5" fill="#2b1d14"></circle></g><circle cx="450" cy="890.4593544271263" r="14" fill="#e4572e"></circle><text x="450" y="897.4593544271263" text-anchor="middle" font-size="20" font-weight="700" fill="#fff">?</text><rect x="1012" y="558" width="18" height="104" rx="4" fill="#e4572e"></rect><g><rect x="772" y="584" width="228" height="52" rx="12" fill="#0d1217" stroke="#e4572e" stroke-width="3"></rect><text x="886" y="617" text-anchor="middle" font-size="20" fill="#fff">Room for one more?</text></g></g>
+</svg>
+<div class="key"><span><i style="background:rgba(46,157,106,.45)"></i>free seat</span><span><i style="border:2px dashed #e4572e"></i>over-occupied seat (detector)</span><span><i style="background:#e4572e;border-radius:50%"></i>person waiting</span></div>
+</div>
+<div>
+<div class="panel">
+<h2>Wall screen</h2>
+<div class="screen on" id="screen"><div class="ico" id="ico">♪</div><div class="msg" id="msg">Getting busy. Room for one more on the sofa?</div></div>
+<p class="cap">Mounted on the right wall between S4 and S5-1. It plays a chime with the message. No voice.</p>
+<div class="ctl"><button class="b p" id="sound">Turn sound on</button><button class="b" id="arrive">Someone walks in</button><button class="b" id="spread">Someone spreads out</button><button class="b" id="leave">Someone leaves</button></div>
+<p class="lbl">Scenarios</p>
+<div class="ctl"><button class="b" data-pre="busy">Busy evening, sprawlers</button><button class="b" data-pre="full">Genuinely full</button><button class="b" data-pre="quiet">Quiet room</button></div>
+<p class="lbl">Simulation</p>
+<div class="ctl"><button class="b" id="auto">Auto crowd: off</button><button class="b sel" id="resp">Room responds to nudge: on</button></div>
+<div class="ctl"><button class="b sel" data-wk="1">Week 1: chime + message</button><button class="b" data-wk="2">Week 2+: chime + icon</button></div>
+</div>
+<div class="panel">
+<div class="stats">
+<div class="stat"><b id="cP">1</b><span>prompts</span></div>
+<div class="stat"><b id="cS">0</b><span>made room</span></div>
+<div class="stat"><b id="cM">0</b><span>misses logged</span></div>
+<div class="stat"><b id="cF">0</b><span>silent, truly full</span></div>
+</div>
+<h2>Trigger rule, live</h2>
+<div class="rule">Someone waiting ≥ 3s <em id="r1" class="y">yes</em></div>
+<div class="rule">No free seat <em id="r2" class="y">yes</em></div>
+<div class="rule">A seat over-occupied ≥ 4s <em id="r3" class="y">yes</em></div>
+<div class="rule">Not in cooldown <em id="r4" class="y">yes</em></div>
+<h2 style="margin-top:14px">Detector log</h2>
+<ul class="log" id="log"></ul>
+<p class="note">Demo timings are shortened. Planned real values: waiting 10s, over-occupied 30s, miss after 2 min, cooldown 10 min. A miss gets logged and is never repeated. On the real device, a pose model (MediaPipe/YOLO) produces these same seat states, and the video is discarded as it's processed.</p>
+</div>
+</div>
+</div>
+</div>
+
+
+<script>
+{
+const T_WAIT=3,T_OVER=4,T_MISS=15,T_COOL=12,SPEED=170;
+const O={x:510,y:1165},E={x:510,y:1010};
+const SOFAS=[
+ {id:'S1',x:135,y:45,w:217,h:83,back:'top',n:2},
+ {id:'S2',x:400,y:45,w:225,h:83,back:'top',n:3},
+ {id:'S3-1',x:668,y:45,w:250,h:92,back:'top',n:3},
+ {id:'S3-2',x:938,y:140,w:84,h:108,back:'right',n:1},
+ {id:'S4',x:938,y:278,w:84,h:217,back:'right',n:2},
+ {id:'S5-1',x:942,y:710,w:83,h:218,back:'right',n:2},
+ {id:'S5-2',x:660,y:968,w:318,h:117,back:'bottom',n:3},
+ {id:'S6-1',x:38,y:990,w:247,h:92,back:'bottom',n:3,fo:30},
+ {id:'S6-2',x:38,y:824,w:94,h:166,back:'left',n:2,fo:30},
+ {id:'S7',x:38,y:523,w:87,h:232,back:'left',n:2},
+ {id:'S8',x:42,y:183,w:85,h:229,back:'left',n:3}
+];
+const LABELS=[['S1',243,170,'middle'],['S2',512,170,'middle'],['S3-1',805,182,'middle'],['S3-2',930,222,'end'],['S4',930,378,'end'],['S5-1',934,822,'end'],['S5-2',818,958,'middle'],['S6-1',292,1050,'start'],['S6-2',85,812,'middle'],['S7',135,662,'start'],['S8',137,302,'start']];
+const SCR={x:1010,y:610};
+const SH=['#e4572e','#f2a541','#2e9d6a','#8c5bd6','#d64a8c','#3a86c8','#5c6b73','#c0392b','#16a085','#e67e22'];
+const PA=['#34495e','#2c3e50','#4a4a4a','#1f3a5f','#5d4037'];
+const HA=['#2b1d14','#3b2a20','#141414','#5a3b22'];
+const MSGS=["Getting busy. Room for one more on the sofa?","Someone's looking for a seat. Feet and bags off the sofa make space.","One more person could fit here if we shuffle a bit."];
+const KINDS=['lie','bag','feet','laptop'];
+const KNAME={lie:'lying across two seats',bag:'bag on the next seat',feet:'feet up on the next seat',laptop:'laptop spread on the next seat'};
+const $=id=>document.getElementById(id);
+const now=()=>performance.now()/1000;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const lerp=(a,b,t)=>a+(b-a)*t;
+const ease=t=>t<.5?2*t*t:1-((-2*t+2)**2)/2;
+const normA=x=>{while(x>Math.PI)x-=2*Math.PI;while(x<-Math.PI)x+=2*Math.PI;return x};
+const lerpA=(a,b,t)=>a+normA(b-a)*t;
+const deg=r=>r*180/Math.PI;
+const cp=p=>({x:p.x,y:p.y});
+
+/* seats */
+const seats=[];
+SOFAS.forEach((s,si)=>{
+ const hz=s.back==='top'||s.back==='bottom',fo=s.fo||45;
+ let x0,x1,y0,y1;
+ if(s.back==='top'){x0=s.x+12;x1=s.x+s.w-12;y0=s.y+20;y1=s.y+s.h}
+ if(s.back==='bottom'){x0=s.x+12;x1=s.x+s.w-12;y0=s.y;y1=s.y+s.h-20}
+ if(s.back==='right'){x0=s.x;x1=s.x+s.w-20;y0=s.y+12;y1=s.y+s.h-12}
+ if(s.back==='left'){x0=s.x+20;x1=s.x+s.w;y0=s.y+12;y1=s.y+s.h-12}
+ const face={top:Math.PI/2,bottom:-Math.PI/2,right:Math.PI,left:0}[s.back];
+ const first=seats.length;
+ for(let i=0;i<s.n;i++){
+  let rx,ry,rw,rh;
+  if(hz){rw=(x1-x0)/s.n;rh=y1-y0;rx=x0+i*rw;ry=y0}else{rh=(y1-y0)/s.n;rw=x1-x0;rx=x0;ry=y0+i*rh}
+  const c={x:rx+rw/2,y:ry+rh/2},half=(hz?rh:rw)/2+fo;
+  seats.push({si,i,x:c.x,y:c.y,rx,ry,rw,rh,face,f:{x:c.x+Math.cos(face)*half,y:c.y+Math.sin(face)*half},occ:null,over:null,st:'empty',since:0,nbs:[]});
+ }
+ for(let i=0;i<s.n;i++){const k=first+i;if(i>0)seats[k].nbs.push(k-1);if(i<s.n-1)seats[k].nbs.push(k+1)}
+});
+const sid=(id,i)=>seats.findIndex(s=>SOFAS[s.si].id===id&&s.i===i);
+function route(k){
+ const s=seats[k],so=SOFAS[s.si],f=s.f;
+ if(so.id==='S6-2')return[E,{x:320,y:800},{x:165,y:800},f,s];
+ if(f.y>=900)return f.x>600?[E,{x:620,y:930},f,s]:[E,f,s];
+ const sx=f.x<530?255:805;
+ return[E,{x:sx,y:800},{x:sx,y:f.y},f,s];
+}
+
+/* static drawing */
+{
+ let h='<rect width="1060" height="1170" fill="transparent"/>';
+ h+='<rect x="30" y="35" width="1000" height="1055" class="floor"/><rect x="30" y="35" width="1000" height="1055" fill="url(#gp)"/>';
+ h+='<rect x="380" y="1090" width="260" height="80" class="floor" opacity=".55"/>';
+ h+='<line x1="30" y1="35" x2="1030" y2="35" class="wall"/><line x1="30" y1="35" x2="30" y2="1090" class="wall"/><line x1="1030" y1="35" x2="1030" y2="1090" class="wall"/><line x1="30" y1="1090" x2="380" y2="1090" class="wall"/><line x1="640" y1="1090" x2="1030" y2="1090" class="wall"/>';
+ h+='<path d="M1018 48 L860 160 L990 210 Z" fill="#e4572e" opacity=".07"/><rect x="1000" y="44" width="22" height="14" rx="3" fill="#333"/><circle cx="1004" cy="51" r="3" fill="#e4572e"/>';
+ h+='<rect x="372" y="218" width="303" height="464" rx="151" class="tb2"/><rect x="440" y="285" width="170" height="327" rx="85" class="tb"/><text x="525" y="458" class="lb" text-anchor="middle">CT</text>';
+ h+='<rect x="168" y="849" width="103" height="102" class="tb"/>';
+ SOFAS.forEach(s=>{h+='<rect x="'+s.x+'" y="'+s.y+'" width="'+s.w+'" height="'+s.h+'" rx="7" class="sf"/>'});
+ seats.forEach(s=>{h+='<rect x="'+(s.rx+2)+'" y="'+(s.ry+2)+'" width="'+(s.rw-4)+'" height="'+(s.rh-4)+'" rx="10" class="cu"/>'});
+ LABELS.forEach(l=>{h+='<text x="'+l[1]+'" y="'+l[2]+'" class="lb" text-anchor="'+l[3]+'">'+l[0]+'</text>'});
+ h+='<text x="510" y="1060" class="ent" text-anchor="middle">Entry</text>';
+ h+='<rect x="1014" y="560" width="14" height="100" rx="3" fill="#0d1217"/><text x="1000" y="690" class="lbs" text-anchor="end">Screen</text>';
+ h+='<text x="990" y="80" class="lbs" text-anchor="end">Camera</text>';
+ $('st').innerHTML=h;
+}
+
+/* state */
+let people=[],pid=0,ep=null,cool=0,silentLogged=false,week=1,msgI=0,thxUntil=0,respondAt=0,auto=false,respond=true;
+let nA=0,nS=0,nL=0,scr='idle',scrMsg='',ripples=[];
+const cnt={P:0,S:0,M:0,F:0};
+let ac=null;
+function mk(){return{id:++pid,x:O.x,y:O.y,ang:-Math.PI/2,mode:'walk',path:[],seat:-1,kind:'sit',nb:-1,a:0,tg:0,sa:0,shirt:pick(SH),pants:pick(PA),hair:pick(HA),ph:Math.random()*6,cyc:Math.floor(Math.random()*4),ws:0}}
+const freeSeats=()=>seats.map((s,k)=>k).filter(k=>seats[k].occ==null&&seats[k].over==null);
+
+function tone(f,st,d,v){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=f;o.connect(g);g.connect(ac.destination);const t=ac.currentTime+st;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.start(t);o.stop(t+d+.05)}
+function chime(){tone(659,0,.9,.18);tone(880,.28,1.1,.15)}
+function thanks(){tone(523,0,.5,.13);tone(659,.12,.5,.13);tone(784,.24,.9,.13)}
+function ripple(col){const t=now();for(let i=0;i<3;i++)ripples.push({t:t+i*.35,col})}
+function log(txt){const li=document.createElement('li');li.innerHTML='<time>'+new Date().toTimeString().slice(0,8)+'</time>'+txt;const L=$('log');L.prepend(li);while(L.children.length>40)L.lastChild.remove()}
+function show(kind,text,ico){scr=kind;scrMsg=text;$('screen').className='screen '+kind;$('msg').textContent=text;$('ico').textContent=ico}
+const idle=()=>show('idle','Idle. Nothing to show.','·');
+
+function waitSpot(){const n=people.filter(p=>p.mode==='wait'||p.goWait).length;return{x:450+(n%4)*42,y:925-Math.floor(n/4)*40}}
+function arrive(){
+ const p=mk(),fr=freeSeats();
+ if(fr.length){const k=pick(fr);seats[k].occ=p.id;p.seat=k;p.path=[E,...route(k).slice(1)].map(cp);log('Someone walked in and is heading to '+SOFAS[seats[k].si].id+'.')}
+ else{p.goWait=true;p.path=[E,waitSpot()].map(cp);log('Someone walked in. No free seat.')}
+ people.push(p);
+}
+function place(k,kind,nb){
+ const s=seats[k],p=mk();p.x=s.x;p.y=s.y;p.ang=s.face;p.mode='seat';p.seat=k;p.sa=1;s.occ=p.id;
+ if(kind&&kind!=='sit'){p.kind=kind;p.nb=nb;p.a=1;p.tg=1;seats[nb].over=p.id}
+ people.push(p);
+}
+function sprawl(p,kind){
+ if(p.mode!=='seat'||p.kind!=='sit'||p.a>0)return false;
+ const nbs=seats[p.seat].nbs.filter(k=>seats[k].occ==null&&seats[k].over==null);
+ if(!nbs.length)return false;
+ const nb=pick(nbs);kind=kind||KINDS[p.cyc++%KINDS.length];
+ seats[nb].over=p.id;p.kind=kind;p.nb=nb;p.tg=1;
+ log('Someone on '+SOFAS[seats[p.seat].si].id+' spread out: '+KNAME[kind]+'.');return true;
+}
+function leave(p){
+ seats[p.seat].occ=null;const r=route(p.seat).reverse().slice(1).map(cp);r.push(cp(O));
+ p.path=r;p.mode='leave';p.seat=-1;log('Someone got up and left.');
+}
+function reset(){people=[];seats.forEach(s=>{s.occ=null;s.over=null;s.st='empty';s.since=now()-6});ep=null;cool=0;thxUntil=0;respondAt=0;silentLogged=false;ripples=[];idle()}
+function preset(name){
+ reset();
+ if(name==='busy'){[['S2',0,1,'lie'],['S5-2',1,2,'bag'],['S8',2,1,'laptop'],['S4',0,1,'feet']].forEach(a=>place(sid(a[0],a[1]),a[3],sid(a[0],a[2])));seats.forEach((s,k)=>{if(s.occ==null&&s.over==null)place(k)})}
+ if(name==='full')seats.forEach((s,k)=>place(k));
+ if(name==='quiet'){place(sid('S7',0),'lie',sid('S7',1));['S1','S3-1','S5-2','S6-1','S8'].forEach(id=>place(sid(id,0)));place(sid('S2',2))}
+ seats.forEach(s=>{s.st=s.over!=null?'over':s.occ!=null?'taken':'empty';s.since=now()-6});
+}
+
+/* main loop */
+let last=now();
+function frame(){
+ const t=now(),dt=Math.min(.05,t-last);last=t;
+ for(const p of people){
+  if(p.path.length){
+   const g=p.path[0],dx=g.x-p.x,dy=g.y-p.y,d=Math.hypot(dx,dy),st=SPEED*dt;
+   if(d<=st){p.x=g.x;p.y=g.y;p.path.shift()}else{p.x+=dx/d*st;p.y+=dy/d*st;p.ang=lerpA(p.ang,Math.atan2(dy,dx),Math.min(1,dt*10))}
+   p.ph+=dt*11;
+   if(!p.path.length){
+    if(p.mode==='leave')p.gone=true;
+    else if(p.seat>=0){p.mode='seat';p.sa=0}
+    else{p.mode='wait';p.goWait=false;p.ws=t}
+   }
+  }
+  if(p.mode==='seat'){
+   const s=seats[p.seat];p.ang=lerpA(p.ang,s.face,Math.min(1,dt*8));p.sa=Math.min(1,p.sa+dt*2.5);
+   if(p.a!==p.tg){p.a=p.tg>p.a?Math.min(1,p.a+dt*1.3):Math.max(0,p.a-dt*1.3)}
+   if(p.tg===0&&p.a===0&&p.kind!=='sit'){seats[p.nb].over=null;p.kind='sit';p.nb=-1}
+  }
+ }
+ people=people.filter(p=>!p.gone);
+ for(const s of seats){const st=s.over!=null?'over':s.occ!=null?'taken':'empty';if(st!==s.st){s.st=st;s.since=t}}
+
+ /* detector + nudge rule */
+ const fr=freeSeats(),free=fr.length;
+ const waiters=people.filter(p=>p.mode==='wait').sort((a,b)=>a.ws-b.ws);
+ const waiting=waiters.length>0&&t-waiters[0].ws>=T_WAIT;
+ const over=seats.some(s=>s.st==='over'&&t-s.since>=T_OVER);
+ const coolOK=t>=cool;
+ setRule('r1',waiting);setRule('r2',free===0);setRule('r3',over);setRule('r4',coolOK);
+ if(ep&&free>0){cnt.S++;thanks();ripple('#2e9d6a');log('A seat was freed after the prompt. Thank-you chime.');show('thx','Thanks, that made room.','✓');thxUntil=t+4;ep=null;cool=t+T_COOL;respondAt=0}
+ if(ep&&t-ep>=T_MISS){cnt.M++;log('No one moved in time. Miss logged, no repeat.');ep=null;cool=t+T_COOL;respondAt=0;idle()}
+ if(!ep&&waiting&&free===0&&over&&coolOK){
+  ep=t;cnt.P++;chime();ripple('#e4572e');
+  if(week===1){show('on',MSGS[msgI%MSGS.length],'♪');msgI++}else show('on','','♪');
+  log('Trigger met: someone waiting, no free seat, a seat over-occupied. Chime + screen.');
+  if(respond)respondAt=t+2+Math.random()*1.5;
+ }
+ if(respondAt&&t>=respondAt){respondAt=0;const sp=people.filter(p=>p.mode==='seat'&&p.kind!=='sit'&&p.tg===1);if(sp.length){const p=pick(sp);p.tg=0;log('Someone on '+SOFAS[seats[p.seat].si].id+' saw the screen and made room.')}}
+ if(waiting&&free===0&&!over&&!silentLogged){silentLogged=true;cnt.F++;log('Room genuinely full, everyone sitting properly. Staying silent.')}
+ if(!waiters.length)silentLogged=false;
+ /* waiting people take freed seats */
+ let pool=freeSeats();
+ for(const p of waiters){if(!pool.length)break;const k=pool.shift();seats[k].occ=p.id;p.seat=k;p.mode='walk';p.path=route(k).slice(1).map(cp);log('The waiting person is heading to '+SOFAS[seats[k].si].id+'.')}
+ if(!ep&&thxUntil&&t>thxUntil){thxUntil=0;idle()}
+ if(!coolOK&&!ep&&!thxUntil&&scr==='idle')$('msg').textContent='Idle. Cooling down ('+Math.ceil(cool-t)+'s).';
+
+ /* auto crowd */
+ if(auto){
+  if(t>nA){nA=t+6+Math.random()*4;if(people.length<34)arrive()}
+  if(t>nS){nS=t+8+Math.random()*5;const c=people.filter(p=>p.mode==='seat'&&p.kind==='sit'&&p.a===0&&p.sa>=1);for(const p of c.sort(()=>Math.random()-.5))if(sprawl(p))break}
+  if(t>nL){nL=t+10+Math.random()*5;const c=people.filter(p=>p.mode==='seat'&&p.kind==='sit'&&p.a===0);if(c.length>16)leave(pick(c))}
+ }
+ ['P','S','M','F'].forEach(k=>$('c'+k).textContent=cnt[k]);
+ draw(t);
+ requestAnimationFrame(frame);
+}
+function setRule(id,v){const e=$(id),s=v?'yes':'no';if(e.textContent!==s){e.textContent=s;e.className=v?'y':'n'}}
+
+/* drawing */
+function personSVG(p,t){
+ let x=p.x,y=p.y,ang=p.ang,h='';
+ if(p.mode==='seat'){
+  const s=seats[p.seat],nb=p.nb>=0?seats[p.nb]:null,a=ease(p.a);
+  let L=0,F=0,lrot=0;
+  if(nb&&p.kind==='lie'){L=a;const da=Math.atan2(nb.y-s.y,nb.x-s.x);ang=lerpA(p.ang,da,a);x=s.x+(nb.x-s.x)*.5*a;y=s.y+(nb.y-s.y)*.5*a}
+  if(nb&&p.kind==='feet')F=a;
+  const tcx=lerp(-8,-14,L),trx=lerp(10,19,L),tr2=lerp(16,12,L),hx=lerp(-6,-36,L),lx=lerp(-4,4,L),ly=lerp(6,4.5,L);
+  let len=lerp(24,40,L)*p.sa;
+  if(F){const da=Math.atan2(nb.y-s.y,nb.x-s.x);lrot=deg(normA(da-p.ang))*F;len=24+F*(Math.hypot(nb.x-s.x,nb.y-s.y)*.8-8)}
+  h+='<g transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+') rotate('+deg(ang).toFixed(1)+') scale(1.15)">';
+  h+='<g transform="translate('+lx.toFixed(1)+' 0) rotate('+lrot.toFixed(1)+')">';
+  [-1,1].forEach(sg=>{h+='<rect x="0" y="'+(sg*ly-4.5).toFixed(1)+'" width="'+len.toFixed(1)+'" height="9" rx="4.5" fill="'+p.pants+'"/><ellipse cx="'+len.toFixed(1)+'" cy="'+(sg*ly).toFixed(1)+'" rx="4.5" ry="4" fill="#1b1b1b"/>'});
+  h+='</g><ellipse cx="'+tcx.toFixed(1)+'" cy="0" rx="'+trx.toFixed(1)+'" ry="'+tr2.toFixed(1)+'" fill="'+p.shirt+'" stroke="rgba(0,0,0,.25)"/>';
+  h+='<circle cx="'+hx.toFixed(1)+'" cy="0" r="8.5" fill="'+p.hair+'"/></g>';
+ }else{
+  const sw=p.path.length?Math.sin(p.ph):0;
+  h+='<g transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+') rotate('+deg(ang).toFixed(1)+') scale(1.15)">';
+  h+='<ellipse cx="'+(3+sw*8).toFixed(1)+'" cy="-6" rx="6" ry="3.6" fill="#1b1b1b"/><ellipse cx="'+(3-sw*8).toFixed(1)+'" cy="6" rx="6" ry="3.6" fill="#1b1b1b"/>';
+  h+='<ellipse cx="0" cy="0" rx="9" ry="15" fill="'+p.shirt+'" stroke="rgba(0,0,0,.25)"/><circle cx="1" cy="0" r="8.5" fill="'+p.hair+'"/></g>';
+  if(p.mode==='wait'){const b=Math.sin(t*4)*2;h+='<circle cx="'+x+'" cy="'+(y-36+b)+'" r="14" fill="#e4572e"/><text x="'+x+'" y="'+(y-29+b)+'" text-anchor="middle" font-size="20" font-weight="700" fill="#fff">?</text>'}
+ }
+ return h;
+}
+function itemSVG(p){
+ if(p.mode!=='seat'||p.nb<0||(p.kind!=='bag'&&p.kind!=='laptop'))return'';
+ const a=ease(p.a);if(a<.02)return'';
+ const s=seats[p.seat],nb=seats[p.nb],x=lerp(s.x,nb.x,a),y=lerp(s.y,nb.y,a)-Math.sin(Math.PI*a)*18,sc=1+.3*Math.sin(Math.PI*a);
+ let h='<g transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+') rotate('+deg(nb.face).toFixed(0)+') scale('+sc.toFixed(2)+')">';
+ if(p.kind==='bag')h+='<rect x="-14" y="-12" width="28" height="24" rx="6" fill="#8a5a3b" stroke="#3e2617" stroke-width="1.5"/><path d="M-8 -12 Q0 -24 8 -12" fill="none" stroke="#3e2617" stroke-width="3"/><rect x="-9" y="-2" width="18" height="8" rx="2" fill="#a8734f"/>';
+ else h+='<rect x="-17" y="-12" width="34" height="24" rx="3" fill="#9aa3ad" stroke="#4a525a" stroke-width="1.5"/><rect x="-14" y="-9" width="28" height="15" rx="2" fill="#cfe3f5"/><path d="M17 4 q14 4 8 16 t10 14" fill="none" stroke="#333" stroke-width="2"/><rect x="-10" y="16" width="14" height="9" rx="2" fill="#555"/>';
+ return h+'</g>';
+}
+function draw(t){
+ let h='';
+ seats.forEach(s=>{
+  if(s.st==='empty')h+='<rect x="'+(s.rx+5)+'" y="'+(s.ry+5)+'" width="'+(s.rw-10)+'" height="'+(s.rh-10)+'" rx="8" fill="rgba(46,157,106,.38)"/>';
+  if(s.st==='over'){const age=Math.floor(t-s.since);h+='<rect x="'+(s.rx+4)+'" y="'+(s.ry+4)+'" width="'+(s.rw-8)+'" height="'+(s.rh-8)+'" rx="8" fill="rgba(228,87,46,.18)" stroke="#e4572e" stroke-width="3" stroke-dasharray="7 5"/><rect x="'+(s.rx+s.rw-42)+'" y="'+(s.ry+3)+'" width="38" height="20" rx="10" fill="#e4572e"/><text x="'+(s.rx+s.rw-23)+'" y="'+(s.ry+18)+'" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">'+age+'s</text>'}
+ });
+ people.forEach(p=>{h+=itemSVG(p)});
+ people.filter(p=>p.mode==='seat').forEach(p=>{h+=personSVG(p,t)});
+ people.filter(p=>p.mode!=='seat').forEach(p=>{h+=personSVG(p,t)});
+ ripples=ripples.filter(r=>t-r.t<1.6);
+ ripples.forEach(r=>{const k=(t-r.t)/1.6;if(k<0)return;h+='<circle cx="'+SCR.x+'" cy="'+SCR.y+'" r="'+(10+k*150).toFixed(1)+'" fill="none" stroke="'+r.col+'" stroke-width="4" opacity="'+(1-k).toFixed(2)+'"/>'});
+ if(scr!=='idle'){
+  const col=scr==='thx'?'#2e9d6a':'#e4572e',txt=scr==='thx'?'Thanks, that made room':(week===1?'Room for one more?':'♪');
+  h+='<rect x="1012" y="558" width="18" height="104" rx="4" fill="'+col+'"/>';
+  const w=Math.max(70,txt.length*11+30);
+  h+='<g><rect x="'+(1000-w)+'" y="584" width="'+w+'" height="52" rx="12" fill="#0d1217" stroke="'+col+'" stroke-width="3"/><text x="'+(1000-w/2)+'" y="617" text-anchor="middle" font-size="20" fill="#fff">'+txt+'</text></g>';
+ }
+ $('dy').innerHTML=h;
+}
+
+/* input */
+const svg=$('plan');
+svg.addEventListener('pointerdown',e=>{
+ const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const m=svg.getScreenCTM();if(!m)return;const q=pt.matrixTransform(m.inverse());
+ let best=null,bd=48;
+ for(const p of people){if(p.mode!=='seat')continue;const s=seats[p.seat];const d=Math.hypot(s.x-q.x,s.y-q.y);if(d<bd){bd=d;best=p}}
+ if(!best)return;
+ if(best.kind!=='sit'&&best.tg===1){best.tg=0;log('Someone on '+SOFAS[seats[best.seat].si].id+' sat up properly.')}
+ else if(best.kind==='sit'&&best.a===0){if(!sprawl(best))log('No empty seat next to them to spread onto.')}
+});
+$('sound').addEventListener('click',()=>{try{if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();ac.resume();chime();$('sound').textContent='Sound on';$('sound').classList.remove('p')}catch(err){$('sound').textContent='Sound unavailable here'}});
+$('arrive').addEventListener('click',arrive);
+$('spread').addEventListener('click',()=>{const c=people.filter(p=>p.mode==='seat'&&p.kind==='sit'&&p.a===0).sort(()=>Math.random()-.5);for(const p of c)if(sprawl(p))return;log('Nobody has an empty seat next to them to spread onto.')});
+$('leave').addEventListener('click',()=>{const w=people.find(p=>p.mode==='wait');if(w){w.mode='leave';w.path=[cp(E),cp(O)];log('A waiting person gave up and left.');return}const c=people.filter(p=>p.mode==='seat'&&p.kind==='sit'&&p.a===0);if(c.length)leave(pick(c))});
+$('auto').addEventListener('click',()=>{auto=!auto;$('auto').textContent='Auto crowd: '+(auto?'on':'off');$('auto').classList.toggle('sel',auto);const t=now();nA=t+1;nS=t+5;nL=t+8});
+$('resp').addEventListener('click',()=>{respond=!respond;$('resp').textContent='Room responds to nudge: '+(respond?'on':'off');$('resp').classList.toggle('sel',respond)});
+document.querySelectorAll('[data-pre]').forEach(b=>b.addEventListener('click',()=>{preset(b.dataset.pre);log('Scenario: '+b.textContent+'.')}));
+document.querySelectorAll('[data-wk]').forEach(b=>b.addEventListener('click',()=>{week=+b.dataset.wk;document.querySelectorAll('[data-wk]').forEach(x=>x.classList.toggle('sel',x===b));log('Mode: '+b.textContent+'.')}));
+
+preset('busy');log('Detector started. Busy evening loaded.');
+setTimeout(arrive,1200);
+requestAnimationFrame(frame);
+}
+</script></body></html>
